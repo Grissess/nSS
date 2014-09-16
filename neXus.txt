@@ -1,0 +1,15 @@
+exec reset.txt
+mount . /neXus/cgi/ nss_fs_ex CGIFileSystem;/httpd/GPSP/neXus/cgi
+mount . /cgi/ nss_basic_ex AllDocuments;gpspdown.html
+mount . /neXus/ nss_fs_ex SimpleFileSystem;/httpd/GPSP/neXus
+mount . / nss_basic_ex Redirector;/neXus/
+mount . /debug/ nss_basic_ex ShowMounts
+mount . /debug/src/ nss_fs_ex SimpleFileSystem;/httpd/nSS
+mount . /debug/code/ nss_fs_ex SimpleFileSystem;/httpd/GPSP/neXus
+mount . /debug/cgi/ nss_fs_ex CGIFileSystem;/httpd/nSS/cgi
+mount . /osb/ nss_fs_ex SimpleFileSystem;/httpd/OSB
+mount . /mindscape/ nss_fs_ex SimpleFileSystem;/httpd/Mindscape/_build/html
+mount . /mindscape/root/ nss_fs_ex SimpleFileSystem;/httpd/Mindscape
+mount . /xfer/ nss_transfer_ex TransferManager
+mount . /bcon/ nss_fs_ex CGIFileSystem;/httpd/bcon
+mount . /hcwh/ nss_hc_webhook EchoManager

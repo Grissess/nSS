@@ -1,0 +1,3 @@
+load nss_basic AllDocuments;bananadoc.html
+load nss_fs SimpleFileSystem;/,C:\\
+enable 0 0

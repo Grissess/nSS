@@ -1,0 +1,25 @@
+<html>
+<head>
+<title>Form Test</title>
+</head>
+<body>
+<p>Form 1: Using GET:</p>
+<form action="/action/" method="GET">
+<p>Text:<input type="text" name="text"/></p>
+<p>Number:<input type="text" name="number"/></p>
+<button type="submit" name="submit" value="1">Submit</button>
+</form>
+<p>Form 2: Using POST:</p>
+<form action="/action/" method="POST">
+<p>Text:<input type="text" name="text"/></p>
+<p>Number:<input type="text" name="number"/></p>
+<button type="submit" name="submit" value="1">Submit</button>
+</form>
+<p>Form 2: Using POST and multipart/form-data:</p>
+<form action="/action/" method="POST" enctype="multipart/form-data">
+<p>File:<input type="file" name="file"/></p>
+<p>Directory:<input type="text" name="dir"/></p>
+<button type="submit" name="submit" value="1">Submit</button>
+</form>
+</body>
+</html>
