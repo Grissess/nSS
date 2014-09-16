@@ -7,14 +7,14 @@ Nearly the entirety of the webserver is contained in one file; most of the actua
 
 The server can be instructed through console commands. On Windows installations, these can be issued at the terminal; on POSIX-compatible systems, a long-standing bug prevents this from occuring (ncurses will exit() the process without warning). The command system can be fairly easily integrated with the `ConsoleHTTPEnvironment` if one wishes to design a method of issuing commands to the server at runtime.
 
-In any case, the first command executed by the server is::
+In any case, the first command executed by the server is:
 
-  exec autoexec.txt
+    exec autoexec.txt
   
 This executes the file `autoexec.txt` line by line. This file may, in turn, execute other files.
 
-Arguably the most important command for startup scripts is the `mount` command, with the following syntax::
+Arguably the most important command for startup scripts is the `mount` command, with the following syntax:
 
-  mount <host> <path> <module> <class>
+    mount <host> <path> <module> <class>
   
 Where `<host>` is the virtual host (as would be present in a `Host:` HTTP header, and may be `.` to represent any valid host), `<path>` is a mount path (which should end with a trailing `/` for managers that serve directories), `<module>` is a python module (anywhere in `sys.path`, including `.`), and `<class>` is a class in that module implementing the `HTTPManager` interface. For examples of this in use, look at `nexus.txt`.
