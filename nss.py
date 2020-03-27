@@ -1166,6 +1166,7 @@ Shuts down the server gently...ish.'''
         print 'This will take up to 5 seconds...'
 
 if curses:
+    import atexit
     class UIThread(threading.Thread):
         def __init__(self, env):
             threading.Thread.__init__(self)
@@ -1179,65 +1180,105 @@ if curses:
                     ch=chr(ch)
                 else:
                     continue
-                if ch=='\b' and self.kbbuf.getvalue():
+                if ch in '\b\x7f' and self.kbbuf.getvalue():
                     self.kbbuf.seek(self.kbbuf.tell()-1)
                     self.kbbuf.truncate()
-                elif ch=='\n' or ch=='\r':
+                elif ch in '\n\r':
                     self.env.AcceptCommand(self.kbbuf.getvalue())
                     self.kbbuf.seek(0)
                     self.kbbuf.truncate()
-                elif ch=='\x00' or ch=='\xe0':
+                elif ch in '\x00\xe0':
                     pass
                 else:
                     self.kbbuf.write(ch)
                 self.env.DisplayBuffer()
             print 'UI thread: exiting, goodbye...'
+    class StreamRedirect(object):
+        def __init__(self, redir, level='STDOUT'):
+            self.redir = redir
+            self.level = level
+        def write(self, s):
+            LOG.write(s)
+            self.redir.Write(s, self.level, True)
     class CursesConsoleHTTPEnvironment(ConsoleHTTPEnvironment):
         def __init__(self):
             ConsoleHTTPEnvironment.__init__(self)
             self.scr=curses.initscr()
-            print '--Got a screen'
+            curses.savetty()
             curses.noecho()
-            print '--Noecho engaged'
             curses.cbreak()
-            print '--Cbreak engaged'
-            self.scr.keypad(1)
-            print '--Keypad enabled'
+            #self.scr.keypad(1)
             curses.start_color()
-            print '--Color engaged'
             maxy, maxx=self.scr.getmaxyx()
-            print '--Got dimensions'
             self.term=self.scr.subwin(maxy-1, maxx, 0, 0)
-            print '--Created terminal subwindow'
-            self.command=self.scr.subwin(1, maxx, maxy, 0)
-            print '--Created command subwindow'
-            self.command.bkgdset(ord(' '), curses.color_pair(curses.COLOR_BLUE))
-            print '--Set background color'
+            self.term.scrollok(True)
+            self.command=self.scr.subwin(1, maxx, maxy-1, 0)
+            self.P_DEFAULT = 0
+            self.P_ERROR = 1
+            self.P_WARNING = 2
+            self.P_NOTICE = 3
+            self.P_INPUT_SAVED = 4
+            self.P_INPUT_ACTIVE = 5
+            curses.init_pair(self.P_ERROR, curses.COLOR_WHITE, curses.COLOR_MAGENTA)
+            curses.init_pair(self.P_WARNING, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+            curses.init_pair(self.P_NOTICE, curses.COLOR_CYAN, curses.COLOR_BLACK)
+            curses.init_pair(self.P_INPUT_SAVED, curses.COLOR_BLUE, curses.COLOR_BLACK)
+            curses.init_pair(self.P_INPUT_ACTIVE, curses.COLOR_WHITE, curses.COLOR_BLUE)
+            self.command.bkgdset(ord(' '), curses.color_pair(self.P_INPUT_ACTIVE))
             self.kbbuf=cStringIO.StringIO()
-##            self.uit=UIThread(self)
-##            self.uit.start()
-        def __del__(self):
-            self.scr.keypad(0)
+            self.uit=UIThread(self)
+            self.uit.start()
+            self.stdout = StreamRedirect(self)
+            sys.stdout = self.stdout
+            sys.stderr = StreamRedirect(self, 'STDERR')
+            atexit.register(self.Stop)
+            self.term.redrawwin()
+            self.command.redrawwin()
+            self.term.noutrefresh()
+            self.command.noutrefresh()
+            curses.doupdate()
+        def Stop(self):
+            #self.scr.keypad(0)
+            print 'Ending console...'
+            curses.resetty()
             curses.nocbreak()
             curses.echo()
             curses.endwin()
-        def Write(self, s, level):
-            if level=='ERROR':
-                at=curses.color_pair(curses.COLOR_RED)
+        def Write(self, s, level, raw = False):
+            if level in ('ERROR', 'STDERR'):
+                at=curses.color_pair(self.P_ERROR)
             elif level=='WARNING':
-                at=curses.color_pair(curses.COLOR_YELLOW)
+                at=curses.color_pair(self.P_WARNING)
             elif level=='NOTICE':
-                at=curses.color_pair(curses.COLOR_CYAN)
+                at=curses.color_pair(self.P_NOTICE)
             else:
                 at=0
-            self.term.addstr(self.Format(s, level)+'\n', at)
-            LOG.write(self.Format(s, level)+'\n')
+            if raw:
+                self.PutString(s, at)
+                LOG.write(s)
+            else:
+                self.PutString(self.Format(s, level)+'\n', at)
+                LOG.write(self.Format(s, level)+'\n')
             self.term.refresh()
+        def PutString(self, s, at):
+            self.term.addstr(s, at)
+            #h, w = self.term.getmaxyx()
+            #h /= 2
+            #iters = 0
+            #while s and iters < 1000:
+            #    iters += 1
+            #    self.term.addstr(s[:w], at)
+            #    s = s[w:]
+            #    y, x = self.term.getyx()
+            #    if y >= h:
+            #        self.term.scroll()
         def DisplayBuffer(self):
-            self.command.addstr(0, 0, self.kbbuf.getvalue())
+            h, w = self.command.getmaxyx()
+            w -= 1
+            self.command.addstr(0, 0, self.kbbuf.getvalue()[-w:].ljust(w, ' '))
             self.command.refresh()
         def AcceptCommand(self, cmd):
-            self.term.addstr('>>> '+cmd+'\n', curses.color_pair(curses.COLOR_BLUE))
+            self.term.addstr('>>> '+cmd+'\n', curses.color_pair(self.P_INPUT_SAVED))
             LOG.write('>>> '+cmd+'\n')
             try:
                 self.onecmd(cmd)
@@ -1303,9 +1344,9 @@ if __name__=='__main__':
     if curses:
         print 'Loading the curses environment...'
         print '(You are using the', os.environ['TERM'], 'terminal)'
-        #env=CursesConsoleHTTPEnvironment()
-        print '(Just kidding, falling back to basic pending further bugfixes...)'
-        env=ConsoleHTTPEnvironment()
+        env=CursesConsoleHTTPEnvironment()
+        #print '(Just kidding, falling back to basic pending further bugfixes...)'
+        #env=ConsoleHTTPEnvironment()
         env.WriteInfo('Using a curses-based console environment...')
     elif msvcrt:
         print 'Loading the MSVCRT environment...'
@@ -1315,7 +1356,7 @@ if __name__=='__main__':
         print 'Loading the default (unspecified) environment...'
         env=ConsoleHTTPEnvironment()
     env.onecmd('exec autoexec.txt')
-    server=HTTPServer(env, ('', 80))
+    server=HTTPServer(env, ('', 8088))
     while RUNNING:
         time.sleep(1) #Nothing left for the main thread to do...
     print 'Main thread: exiting, goodbye...'
